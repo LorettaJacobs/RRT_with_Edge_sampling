@@ -1,0 +1,2 @@
+Fragen:
+- Was versteht man unter 2 DoF (oder 4DoF) PlanarManipulator?
