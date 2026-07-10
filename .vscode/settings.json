@@ -1,0 +1,10 @@
+{
+    "flake8.args": [
+        "--max-line-length=218"
+    ],
+    "[python]": {
+        "editor.rulers": [
+            218
+        ]
+    }
+}
