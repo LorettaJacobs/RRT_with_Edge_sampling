@@ -23,13 +23,13 @@ class PRMBase(PlanerBase):
         super(PRMBase, self).__init__(collChecker)
         self.graph: nx.Graph[Any] = nx.Graph()
 
-    def _getRandomPosition(self):
+    def _getRandomPosition(self) -> np.ndarray:
         limits = self.collisionChecker.getEnvironmentLimits()
         pos = [random.uniform(limit[0], limit[1]) for limit in limits]
-        return pos
+        return np.array(pos)
 
     @IPPerfMonitor
-    def _getRandomFreePosition(self):
+    def _getRandomFreePosition(self) -> np.ndarray:
         pos = self._getRandomPosition()
         while self.collisionChecker.pointInCollision(pos):
             pos = self._getRandomPosition()
@@ -51,4 +51,8 @@ class PRMBase(PlanerBase):
         return list(nx.get_node_attributes(self.graph, "pos").values())  # type: ignore
 
     def getShortestPathFromStartToGoal(self) -> List[np.ndarray]:
-        return nx.shortest_path(self.graph, "start", "goal")  # type: ignore
+        try:
+            return nx.shortest_path(self.graph, "start", "goal")  # type: ignore
+        except nx.NetworkXNoPath:
+            print("No path found from start to goal")
+            return []

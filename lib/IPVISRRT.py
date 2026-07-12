@@ -8,7 +8,6 @@ License is based on Creative Commons: Attribution-NonCommercial 4.0 Internationa
 
 from typing import List
 
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -28,21 +27,36 @@ def rrtPRMVisualize(
     pos_map = nx.get_node_attributes(graph, "pos")  # type: ignore
     # draw graph
 
+    node_modes = list(nx.get_node_attributes(graph, "mode").values())  # type: ignore
+    node_colors = [
+        (
+            "#00D0FF"
+            if mode == "forward"
+            else "#3CFF00" if mode == "backward" else "#B78000"
+        )
+        for mode in node_modes
+    ]
+
     collChecker.drawObstacles(ax)
+
     nx.draw_networkx_nodes(
-        graph, pos_map, ax=ax, cmap=cm.Blues, node_size=nodeSize
+        graph,
+        pos_map,
+        ax=ax,
+        node_color=node_colors,
+        node_size=nodeSize,
     )
     nx.draw_networkx_edges(graph, pos_map, ax=ax)
 
+    # labels = {n: str(n) for n in graph.nodes()}
+    # nx.draw_networkx_labels(graph, pos_map, labels=labels, ax=ax)
+
     # draw nodes based on solution path
     Gsp = nx.subgraph(graph, solution)  # type: ignore
-    nx.draw_networkx_nodes(
-        Gsp, pos_map, node_size=nodeSize, node_color="g", ax=ax  # type: ignore
-    )
 
     # draw edges based on solution path
     nx.draw_networkx_edges(
-        Gsp, pos_map, alpha=0.8, edge_color="g", width=3.0, ax=ax  # type: ignore
+        Gsp, pos_map, alpha=0.5, edge_color="g", width=3.0, ax=ax  # type: ignore
     )
 
     # draw start and goal
