@@ -47,7 +47,6 @@ class CollisionChecker(object):
             and self.limits[1][0] <= pos[1] <= self.limits[1][1]
         )
 
-    @IPPerfMonitor
     def pointInCollision(self, pos: np.ndarray) -> bool:
         """Return whether a configuration is invalid.
         Collision or outside limits -> True
@@ -61,7 +60,6 @@ class CollisionChecker(object):
                 return True
         return False
 
-    @IPPerfMonitor
     def lineInCollision(
         self,
         startPos: np.ndarray,
@@ -84,7 +82,6 @@ class CollisionChecker(object):
                 return True
         return False
 
-    @IPPerfMonitor
     def lineInCollisionExact(
         self,
         startPos: np.ndarray,

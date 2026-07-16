@@ -65,10 +65,7 @@ class KinChainCollisionChecker(CollisionChecker):
     def getDim(self):
         return self.dim
 
-    @IPPerfMonitor
-    def pointInCollision(  [override]
-        self, pos: np.ndarray
-    ) -> bool:
+    def pointInCollision(self, pos: np.ndarray) -> bool:
         self.kin_chain.move(pos)
         joint_positions = self.kin_chain.get_transforms()
         for i in range(1, len(joint_positions)):
@@ -79,7 +76,7 @@ class KinChainCollisionChecker(CollisionChecker):
         return False
 
     @IPPerfMonitor
-    def lineInCollision(  [override]
+    def lineInCollision(
         self,
         startPos: np.ndarray,
         endPos: np.ndarray,
@@ -110,8 +107,8 @@ class KinChainCollisionChecker(CollisionChecker):
     def drawObstacles(self, ax: plt.Axes | None, inWorkspace: bool = False):
         if inWorkspace:
             for _, value in self.scene.items():
-                plotting.plot_polygon(  
-                    value, add_points=False, color="red", ax=ax  
+                plotting.plot_polygon(
+                    value, add_points=False, color="red", ax=ax
                 )
 
 
@@ -122,7 +119,7 @@ def planarRobotVisualize(
     for i in range(1, len(joint_positions)):
         xs = [joint_positions[i - 1][0], joint_positions[i][0]]
         ys = [joint_positions[i - 1][1], joint_positions[i][1]]
-        ax.plot(xs, ys, color=color)  
+        ax.plot(xs, ys, color=color)
 
 
 matplotlib.rcParams["animation.embed_limit"] = 64
@@ -142,9 +139,9 @@ def animateSolution(
 
     if _environment.getDim() == 2:
 
-        fig_local = plt.figure(figsize=(14, 7))  
-        ax1 = fig_local.add_subplot(1, 2, 1)  
-        ax2 = fig_local.add_subplot(1, 2, 2)  
+        fig_local = plt.figure(figsize=(14, 7))
+        ax1 = fig_local.add_subplot(1, 2, 1)
+        ax2 = fig_local.add_subplot(1, 2, 2)
         # get positions for solution
         solution_pos = [
             _planner.graph.nodes[node]["pos"] for node in _solution
@@ -181,7 +178,7 @@ def animateSolution(
             # draw graph and path
             _prmVisualizer(_planner, solution, ax2, None)
             # draw current position in joint space
-            ax2.scatter(  
+            ax2.scatter(
                 i_solution_pos[t][0],
                 i_solution_pos[t][1],
                 color="r",
@@ -192,12 +189,12 @@ def animateSolution(
         ani = matplotlib.animation.FuncAnimation(
             fig_local, animate, frames=frames
         )
-        html = HTML(ani.to_jshtml())  
+        html = HTML(ani.to_jshtml())
         display(html)
-        plt.close()  
+        plt.close()
     else:
-        fig_local = plt.figure(figsize=(7, 7))  
-        ax1 = fig_local.add_subplot(1, 1, 1)  
+        fig_local = plt.figure(figsize=(7, 7))
+        ax1 = fig_local.add_subplot(1, 1, 1)
         # get positions for solution
         solution_pos = [
             _planner.graph.nodes[node]["pos"] for node in _solution
@@ -232,6 +229,6 @@ def animateSolution(
         ani = matplotlib.animation.FuncAnimation(
             fig_local, animate, frames=frames
         )
-        html = HTML(ani.to_jshtml())  
+        html = HTML(ani.to_jshtml())
         display(html)
-        plt.close()  
+        plt.close()

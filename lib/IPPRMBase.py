@@ -28,7 +28,6 @@ class PRMBase(PlanerBase):
         pos = [random.uniform(limit[0], limit[1]) for limit in limits]
         return np.array(pos)
 
-    @IPPerfMonitor
     def _getRandomFreePosition(self) -> np.ndarray:
         pos = self._getRandomPosition()
         while self.collisionChecker.pointInCollision(pos):

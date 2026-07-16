@@ -51,13 +51,37 @@ class BiRRT(PRMBase):
         nearest_node = list(subtree.nodes(data=True))[nearest_index_in_subtree]
         return nearest_node
 
-    def getNextMode(self) -> Union[Literal["forward"], Literal["backward"]]:
-        if (
-            self.getForwardSubtree().number_of_nodes()
-            <= self.getBackwardSubtree().number_of_nodes()
-        ):
-            return "forward"
-        return "backward"
+    def getNextMode(
+        self, config: Dict[str, Any]
+    ) -> Union[Literal["forward"], Literal["backward"]]:
+        if config.get("balanceTree", False):
+            if (
+                self.getForwardSubtree().number_of_nodes()
+                <= self.getBackwardSubtree().number_of_nodes()
+            ):
+                return "forward"
+            return "backward"
+        else:
+            if not hasattr(self, "_mode"):
+                self._mode = "forward"
+                return self._mode
+            else:
+                self._mode = (
+                    "backward" if self._mode == "forward" else "forward"
+                )
+                return self._mode
+
+    def stepTowardCandidate(
+        self,
+        candidatePos: np.ndarray,
+        nearestNeighborPos: np.ndarray,
+        config: Dict[str, Any],
+    ) -> np.ndarray:
+        diff = candidatePos - nearestNeighborPos
+        dist = np.linalg.norm(diff)
+        stepSize = config.get("stepSize", np.inf)
+        thisStep = min(dist, stepSize)
+        return nearestNeighborPos + (diff / dist) * thisStep
 
     @IPPerfMonitor
     def planPath(  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -76,6 +100,8 @@ class BiRRT(PRMBase):
         Example:
             config["numberOfGeneratedNodes"] = 500
             config["testGoalAfterNumberOfNodes"]  = 10
+            config["balanceTree"] = True
+            config["stepSize"] = 1.0
         """
         # 0. reset
         self.graph.clear()
@@ -101,25 +127,29 @@ class BiRRT(PRMBase):
         )
         self.lastGeneratedNodeNumber += 1
 
+        stepSize = config.get("stepSize", np.inf)
+
         while self.lastGeneratedNodeNumber < config["numberOfGeneratedNodes"]:
 
-            mode = self.getNextMode()
+            mode = self.getNextMode(config)
 
-            new_candidate_pos = self._getRandomFreePosition()
+            random_free_pos = self._getRandomFreePosition()
 
-            # for every node in graph find nearest neigbhours with same mode
             nearest_neighbor_idx, nearest_neighbor = (
-                self.getNearestNeighborInSubtree(new_candidate_pos, mode)
+                self.getNearestNeighborInSubtree(random_free_pos, mode)
             )
-            # result = fullKdTree.query(pos, k=1)
-            # print result
+
+            candidate_step = self.stepTowardCandidate(
+                random_free_pos, nearest_neighbor["pos"], config
+            )
+
             if not self.collisionChecker.lineInCollision(
                 nearest_neighbor["pos"],
-                new_candidate_pos,
+                candidate_step,
             ):
                 self.graph.add_node(
                     self.lastGeneratedNodeNumber,
-                    pos=new_candidate_pos,
+                    pos=candidate_step,
                     mode=mode,
                 )
 
@@ -128,13 +158,19 @@ class BiRRT(PRMBase):
                 )
                 nearestOtherNeighborIdx, nearestOtherNeighbor = (
                     self.getNearestNeighborInSubtree(
-                        new_candidate_pos,
+                        candidate_step,
                         "backward" if mode == "forward" else "forward",
                     )
                 )
-                if not self.collisionChecker.lineInCollision(
-                    nearestOtherNeighbor["pos"],
-                    new_candidate_pos,
+                conn_dist = np.linalg.norm(  # type: ignore
+                    candidate_step - nearestOtherNeighbor["pos"]
+                )
+                if (
+                    not self.collisionChecker.lineInCollision(
+                        nearestOtherNeighbor["pos"],
+                        candidate_step,
+                    )
+                    and conn_dist <= stepSize
                 ):
                     self.graph.add_edge(
                         self.lastGeneratedNodeNumber,
