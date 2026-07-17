@@ -1,5 +1,5 @@
 """ 
-Author: Loretta Jacobs
+Autor: Loretta Jacobs
 Some parts were copied or inspired by IPTestSuite.py
 """
 

@@ -1,3 +1,6 @@
+""" 
+Autor: Alisa Hummel
+"""
 import unittest
 from PointProjection import projectPointOnEdge
 from numpy.testing import assert_array_equal

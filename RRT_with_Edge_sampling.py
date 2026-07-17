@@ -1,3 +1,6 @@
+""" 
+Autor: Ole Hocker
+"""
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple, TypedDict
 
 import networkx as nx

@@ -1,5 +1,5 @@
 """ 
-Author: Loretta Jacobs
+Autor: Loretta Jacobs
 """
 
 import networkx as nx

@@ -1,3 +1,6 @@
+""" 
+Autor: Alisa Hummel
+"""
 from typing import Tuple
 
 import numpy as np
