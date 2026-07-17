@@ -19,7 +19,7 @@ def rrtPRMVisualize(
     planner: PRMBase,
     solution: List[np.ndarray],
     ax: plt.Axes | None = None,
-    nodeSize: int = 300,
+    nodeSize: int = 50,
 ):
     """Draw graph, obstacles and solution in a axis environment of matplotib."""
     graph = planner.graph
@@ -27,14 +27,9 @@ def rrtPRMVisualize(
     pos_map = nx.get_node_attributes(graph, "pos")  # type: ignore
     # draw graph
 
-    node_modes = list(nx.get_node_attributes(graph, "mode").values())  # type: ignore
+    node_modes = list(nx.get_node_attributes(graph, "mode", default="not_bi_rrt").values())  # type: ignore
     node_colors = [
-        (
-            "#00D0FF"
-            if mode == "forward"
-            else "#3CFF00" if mode == "backward" else "#B78000"
-        )
-        for mode in node_modes
+        ("#0091FF" if mode == "forward" else "#FF5900") for mode in node_modes
     ]
 
     collChecker.drawObstacles(ax)
