@@ -122,9 +122,9 @@ class BiRRTEdge(PRMBase):
     ) -> np.ndarray:
         if sampleGoalProbability > np.random.rand():
             goalNode = (
-                self.graph.nodes[0]
+                self.graph.nodes[1]
                 if mode == "forward"
-                else self.graph.nodes[1]
+                else self.graph.nodes[0]
             )
             return np.asarray(goalNode["pos"])  # type: ignore
         return self._getRandomFreePosition()
@@ -205,7 +205,7 @@ class BiRRTEdge(PRMBase):
 
             # handle case when there are no edges yet (only start node / goal node in backward mode)
             if not edges:
-                begin_pos = (
+                begin_pos = np.asarray(
                     self.graph.nodes[0]["pos"]
                     if mode == "forward"
                     else self.graph.nodes[1]["pos"]
@@ -257,24 +257,26 @@ class BiRRTEdge(PRMBase):
                 candidate_step,
                 steps=collisionDetectionSteps,
             ):
+                candidate_node_id = self.lastGeneratedNodeNumber
                 self.graph.add_node(
-                    self.lastGeneratedNodeNumber,
+                    candidate_node_id,
                     pos=candidate_step,
                     mode=mode,
                 )
-                candidate_node_id = self.lastGeneratedNodeNumber
                 self.lastGeneratedNodeNumber += 1
 
                 if (
                     nearest_proj_point.t > orthogonalityMargin
                     and nearest_proj_point.t < 1 - orthogonalityMargin
                 ):
-                    new_node_id = self.divide_edge(
+                    divided_edge_node_id = self.divide_edge(
                         nearest_proj_point.point,
                         nearest_proj_point.edge_start_id,
                         nearest_proj_point.edge_end_id,
                     )
-                    self.graph.add_edge(new_node_id, candidate_node_id)
+                    self.graph.add_edge(
+                        divided_edge_node_id, candidate_node_id
+                    )
                     # Check if graph is still acyclic and connected
                     if not nx.is_tree(
                         self.getForwardSubtree()
@@ -300,29 +302,7 @@ class BiRRTEdge(PRMBase):
                         candidate_node_id,
                     )
 
-            nearest_neighbor_idx, nearest_neighbor = (
-                self.getNearestNeighborInSubtree(random_free_pos, mode)
-            )
-
-            candidate_step = self.stepTowardCandidate(
-                random_free_pos, nearest_neighbor["pos"], stepSize
-            )
-
-            # test new_node connection to the nearest neighbor in the other subtree
-            if not self.collisionChecker.lineInCollision(
-                nearest_neighbor["pos"],
-                candidate_step,
-                steps=collisionDetectionSteps,
-            ):
-                self.graph.add_node(
-                    self.lastGeneratedNodeNumber,
-                    pos=candidate_step,
-                    mode=mode,
-                )
-
-                self.graph.add_edge(
-                    nearest_neighbor_idx, self.lastGeneratedNodeNumber
-                )
+                # test new_node connection to the nearest neighbor in the other subtree
                 nearestOtherNeighborIdx, nearestOtherNeighbor = (
                     self.getNearestNeighborInSubtree(
                         candidate_step,
@@ -340,7 +320,7 @@ class BiRRTEdge(PRMBase):
                     and conn_dist <= stepSize
                 ):
                     self.graph.add_edge(
-                        self.lastGeneratedNodeNumber,
+                        candidate_node_id,
                         nearestOtherNeighborIdx,
                     )
                     mapping = {0: "start", 1: "goal"}
