@@ -18,8 +18,8 @@ class TestDivideEdge(unittest.TestCase):
         pointId = self.lastGeneratedNodeNumber
 
         self.graph.clear()
-        self.graph.add_node(startId, start)
-        self.graph.add_node(endId, end)
+        self.graph.add_node(startId, pos=start)
+        self.graph.add_node(endId, pos=end)
         self.graph.add_edge(startId, endId)
         
         divide_edge(self, point, startId, endId)
