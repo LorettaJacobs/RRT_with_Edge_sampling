@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -71,6 +71,20 @@ class BiRRT(PRMBase):
                 )
                 return self._mode
 
+    def sampleNextPosition(
+        self,
+        mode: Union[Literal["forward"], Literal["backward"]],
+        sampleGoalProbability: float,
+    ) -> np.ndarray:
+        if sampleGoalProbability > np.random.rand():
+            goalNode = (
+                self.graph.nodes[0]
+                if mode == "forward"
+                else self.graph.nodes[1]
+            )
+            return np.asarray(goalNode["pos"])  # type: ignore
+        return self._getRandomFreePosition()
+
     def stepTowardCandidate(
         self,
         candidatePos: np.ndarray,
@@ -89,7 +103,7 @@ class BiRRT(PRMBase):
         startList: List[np.ndarray],
         goalList: List[np.ndarray],
         config: Dict[str, Any],
-    ) -> List[np.ndarray]:
+    ) -> Tuple[List[np.ndarray], Optional[str]]:
         """
 
         Args:
@@ -129,11 +143,20 @@ class BiRRT(PRMBase):
 
         stepSize = config.get("stepSize", np.inf)
 
-        while self.lastGeneratedNodeNumber < config["numberOfGeneratedNodes"]:
+        numIterations: int = 0
+        maxIterations: int = config.get("maxIterations", 10000)
+        sampleGoalProbability: float = config.get("sampleGoalProbability", 0.0)
 
+        collisionDetectionSteps = config.get("collisionDetectionSteps", 40)
+        while self.lastGeneratedNodeNumber < config["numberOfGeneratedNodes"]:
+            if numIterations >= maxIterations:
+                return [], "max_iterations_reached"
+            numIterations += 1
             mode = self.getNextMode(config)
 
-            random_free_pos = self._getRandomFreePosition()
+            random_free_pos = self.sampleNextPosition(
+                mode, sampleGoalProbability
+            )
 
             nearest_neighbor_idx, nearest_neighbor = (
                 self.getNearestNeighborInSubtree(random_free_pos, mode)
@@ -146,6 +169,7 @@ class BiRRT(PRMBase):
             if not self.collisionChecker.lineInCollision(
                 nearest_neighbor["pos"],
                 candidate_step,
+                steps=collisionDetectionSteps,
             ):
                 self.graph.add_node(
                     self.lastGeneratedNodeNumber,
@@ -178,7 +202,7 @@ class BiRRT(PRMBase):
                     )
                     mapping = {0: "start", 1: "goal"}
                     self.graph = nx.relabel_nodes(self.graph, mapping)
-                    return self.getShortestPathFromStartToGoal()
+                    return self.getShortestPathFromStartToGoal(), None
                 self.lastGeneratedNodeNumber += 1
 
-        return []
+        return [], "max_nodes_reached"

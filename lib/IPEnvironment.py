@@ -14,8 +14,6 @@ from shapely import plotting
 from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
 
-from lib.IPPerfMonitor import IPPerfMonitor
-
 
 class CollisionChecker(object):
 
@@ -75,9 +73,12 @@ class CollisionChecker(object):
         dim = self.getDim()
         for i in range(steps + 1):
             t = i / steps
-            testPoint = [
-                startPos[d] + t * (endPos[d] - startPos[d]) for d in range(dim)
-            ]
+            testPoint = np.asarray(
+                [
+                    startPos[d] + t * (endPos[d] - startPos[d])
+                    for d in range(dim)
+                ]
+            )
             if self.pointInCollision(testPoint):
                 return True
         return False
