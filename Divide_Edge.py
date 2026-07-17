@@ -15,7 +15,7 @@ def divide_edge(self, edgePoint: Point, start_Id: int, end_Id: int):
         self.lastGeneratedNodeNumber += 1
         
         # Check if graph is still acyclic and connected
-        if(nx.is_tree(self.graph)):
+        if(not nx.is_tree(self.graph)):
             raise Exception(
                 "The graph is either not connected or not acyclic"
             )
