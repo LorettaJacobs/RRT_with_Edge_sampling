@@ -109,23 +109,23 @@ class RRTEdge(PRMBase):
         self.goal_pos = np.asarray(checkedGoalList[0])
 
         stepSize = config.get("stepSize", np.inf)
-
         numIterations: int = 0
         maxIterations: int = config.get("maxIterations", 10000)
         sampleGoalProbability: float = config.get("sampleGoalProbability", 0.0)
         orthogonalityMargin: float = config.get("orthogonalityMargin", 0.0)
-
         collisionDetectionSteps = config.get("collisionDetectionSteps", 40)
         numberOfGeneratedNodes = config.get("numberOfGeneratedNodes", 200)
+        numGoalTests: int = 0
+
         while self.lastGeneratedNodeNumber < numberOfGeneratedNodes:
             if numIterations >= maxIterations:
                 return [], "max_iterations_reached"
             numIterations += 1
 
             if (
-                self.lastGeneratedNodeNumber
-                % config["testGoalAfterNumberOfNodes"]
-            ) == 0:
+                self.lastGeneratedNodeNumber // config["testGoalAfterNumberOfNodes"] > numGoalTests
+            ):
+                numGoalTests += 1
                 proj_points: List[ProjectedPoint] = []
 
                 edges = self.graph.edges()
