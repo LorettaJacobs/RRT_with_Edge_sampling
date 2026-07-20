@@ -8,7 +8,6 @@ import networkx as nx
 import numpy as np
 from scipy.spatial import KDTree
 
-from lib.IPEnvironment import CollisionChecker
 from lib.IPPerfMonitor import IPPerfMonitor
 from lib.IPPRMBase import PRMBase
 from PointProjection import projectPointOnEdge
@@ -37,28 +36,17 @@ type Point = np.ndarray
 
 class RRTEdge(PRMBase):
 
-    def __init__(self, collChecker: CollisionChecker):
-        """
-        _collChecker: the collision checker interface
-        """
-        super(RRTEdge, self).__init__(collChecker)
-        self.lastGeneratedNodeNumber: int = 0
-
     def divide_edge(self, edgePoint: Point, start_Id: int, end_Id: int):
         # Remove old edge
         self.graph.remove_edge(start_Id, end_Id)
 
         # Add new edges and point
-        self.graph.add_node(
-            self.lastGeneratedNodeNumber, pos=edgePoint, type="projected"
-        )
+        projected_node_id = self.createNode(edgePoint, type="projected")
 
-        self.graph.add_edge(start_Id, self.lastGeneratedNodeNumber)
-        self.graph.add_edge(self.lastGeneratedNodeNumber, end_Id)
+        self.graph.add_edge(start_Id, projected_node_id)
+        self.graph.add_edge(projected_node_id, end_Id)
 
-        self.lastGeneratedNodeNumber += 1
-
-        return self.lastGeneratedNodeNumber - 1
+        return projected_node_id
 
     def sampleNextPosition(
         self,
@@ -79,6 +67,22 @@ class RRTEdge(PRMBase):
         thisStep = min(dist, stepSize)
         return nearestNeighborPos + (diff / dist) * thisStep
 
+    def setup(self, startList: List[Point], goalList: List[Point]):
+        self.graph.clear()
+        self.lastGeneratedNodeNumber = 0
+
+        checkedStartList, checkedGoalList = self._checkStartGoal(
+            startList, goalList
+        )
+        self.start_pos = np.asarray(checkedStartList[0])
+        self.goal_pos = np.asarray(checkedGoalList[0])
+
+        self.start_node_id = 0
+        # self.goal_node_id = 1
+
+        self.createNode(self.start_pos, type="start")
+        # self.createNode(self.goal_pos, mode="backward")
+
     @IPPerfMonitor
     def planPath(  # pyright: ignore[reportIncompatibleVariableOverride]
         self,
@@ -93,32 +97,17 @@ class RRTEdge(PRMBase):
             goal (array) : goal position in planning space
             config (dict): dictionary with the needed information about the configuration options
         """
-        # 0. reset
-        self.graph.clear()
-        self.lastGeneratedNodeNumber = 0
+        self.setup(startList, goalList)
 
-        # 1. check start and goal whether collision free (s. BaseClass)
-        checkedStartList, checkedGoalList = self._checkStartGoal(
-            startList, goalList
-        )
-
-        # 2. add start
-        self.graph.add_node(
-            0,
-            pos=np.asarray(checkedStartList[0]),
-        )
-        self.lastGeneratedNodeNumber += 1
-
-        self.goal_pos = np.asarray(checkedGoalList[0])
+        numIterations: int = 0
+        numGoalTests: int = 0
 
         stepSize = config.get("stepSize", np.inf)
-        numIterations: int = 0
         maxIterations: int = config.get("maxIterations", 10000)
         sampleGoalProbability: float = config.get("sampleGoalProbability", 0.0)
         orthogonalityMargin: float = config.get("orthogonalityMargin", 0.0)
         collisionDetectionSteps = config.get("collisionDetectionSteps", 40)
         numberOfGeneratedNodes = config.get("numberOfGeneratedNodes", 200)
-        numGoalTests: int = 0
 
         while self.lastGeneratedNodeNumber < numberOfGeneratedNodes:
             if numIterations >= maxIterations:
@@ -150,23 +139,25 @@ class RRTEdge(PRMBase):
                 pos_list = [x.point for x in proj_points]
                 kd_tree = KDTree(pos_list)
                 _, nearest_index_in_projection_points = kd_tree.query(
-                    checkedGoalList[0], k=1
+                    self.goal_pos, k=1
                 )
                 nearest_proj_point = proj_points[
                     nearest_index_in_projection_points
                 ]
+
+                # optional: step toward goal instead of directly connecting
+                #
+                # candidate_step = self.stepTowardCandidate(
+                #    self.goal_pos, nearest_proj_point.point, stepSize
+                # )
+
                 # check if the goal is reachable from the candidate
                 if not self.collisionChecker.lineInCollision(
                     nearest_proj_point.point,
-                    checkedGoalList[0],
+                    self.goal_pos,
                     steps=collisionDetectionSteps,
                 ):
-                    self.graph.add_node(
-                        self.lastGeneratedNodeNumber,
-                        pos=checkedGoalList[0],
-                    )
-                    goal_node_id = self.lastGeneratedNodeNumber
-                    self.lastGeneratedNodeNumber += 1
+                    goal_node_id = self.createNode(self.goal_pos, type="goal")
 
                     if (
                         nearest_proj_point.t > orthogonalityMargin
@@ -205,19 +196,16 @@ class RRTEdge(PRMBase):
 
             # handle case when there are no edges yet (only start node)
             if not edges:
-                start = self.graph.nodes[0]["pos"]
                 candidate_step = self.stepTowardCandidate(
-                    random_free_pos, start, stepSize
+                    random_free_pos, self.start_pos, stepSize
                 )
                 if not self.collisionChecker.lineInCollision(
-                    start, candidate_step, steps=collisionDetectionSteps
+                    self.start_pos,
+                    candidate_step,
+                    steps=collisionDetectionSteps,
                 ):
-                    self.graph.add_node(
-                        self.lastGeneratedNodeNumber,
-                        pos=candidate_step,
-                    )
-                    self.graph.add_edge(0, self.lastGeneratedNodeNumber)
-                    self.lastGeneratedNodeNumber += 1
+                    candidate_node_id = self.createNode(candidate_step)
+                    self.graph.add_edge(0, candidate_node_id)
                 continue
 
             proj_points: List[ProjectedPoint] = []
@@ -249,12 +237,7 @@ class RRTEdge(PRMBase):
                 candidate_step,
                 steps=collisionDetectionSteps,
             ):
-                self.graph.add_node(
-                    self.lastGeneratedNodeNumber,
-                    pos=candidate_step,
-                )
-                candidate_node_id = self.lastGeneratedNodeNumber
-                self.lastGeneratedNodeNumber += 1
+                candidate_node_id = self.createNode(candidate_step)
 
                 if (
                     nearest_proj_point.t > orthogonalityMargin

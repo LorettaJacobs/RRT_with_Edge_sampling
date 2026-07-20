@@ -15,6 +15,7 @@ import numpy as np
 from lib.IPEnvironment import CollisionChecker
 from lib.IPPerfMonitor import IPPerfMonitor
 from lib.IPPlanerBase import PlanerBase
+from PointProjection import Point
 
 
 class PRMBase(PlanerBase):
@@ -22,6 +23,7 @@ class PRMBase(PlanerBase):
     def __init__(self, collChecker: CollisionChecker):
         super(PRMBase, self).__init__(collChecker)
         self.graph: nx.Graph[Any] = nx.Graph()
+        self.lastGeneratedNodeNumber: int = 0
 
     def _getRandomPosition(self) -> np.ndarray:
         limits = self.collisionChecker.getEnvironmentLimits()
@@ -33,6 +35,11 @@ class PRMBase(PlanerBase):
         while self.collisionChecker.pointInCollision(pos):
             pos = self._getRandomPosition()
         return pos
+
+    def createNode(self, pos: Point, **kwargs: Any) -> int:
+        self.graph.add_node(self.lastGeneratedNodeNumber, pos=pos, **kwargs)
+        self.lastGeneratedNodeNumber += 1
+        return self.lastGeneratedNodeNumber - 1
 
     @IPPerfMonitor
     def planPath(

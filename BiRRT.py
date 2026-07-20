@@ -4,9 +4,9 @@ import networkx as nx
 import numpy as np
 from scipy.spatial import KDTree
 
-from lib.IPEnvironment import CollisionChecker
 from lib.IPPerfMonitor import IPPerfMonitor
 from lib.IPPRMBase import PRMBase
+from PointProjection import Point
 
 
 class BiRRTConfig(TypedDict):
@@ -21,13 +21,6 @@ class BiRRTConfig(TypedDict):
 
 
 class BiRRT(PRMBase):
-
-    def __init__(self, collChecker: CollisionChecker):
-        """
-        _collChecker: the collision checker interface
-        """
-        super(BiRRT, self).__init__(collChecker)
-        self.lastGeneratedNodeNumber: int = 0
 
     def getForwardSubtree(self) -> nx.Graph[Any]:
         forwardGraphNodes = [
@@ -107,6 +100,22 @@ class BiRRT(PRMBase):
         thisStep = min(dist, stepSize)
         return nearestNeighborPos + (diff / dist) * thisStep
 
+    def setup(self, startList: List[Point], goalList: List[Point]):
+        self.graph.clear()
+        self.lastGeneratedNodeNumber = 0
+
+        checkedStartList, checkedGoalList = self._checkStartGoal(
+            startList, goalList
+        )
+        self.start_pos = checkedStartList[0]
+        self.goal_pos = checkedGoalList[0]
+
+        self.start_node_id = 0
+        self.goal_node_id = 1
+
+        self.createNode(self.start_pos, mode="forward")
+        self.createNode(self.goal_pos, mode="backward")
+
     @IPPerfMonitor
     def planPath(  # pyright: ignore[reportIncompatibleVariableOverride]
         self,
@@ -115,46 +124,20 @@ class BiRRT(PRMBase):
         config: BiRRTConfig,
     ) -> Tuple[List[np.ndarray], Optional[str]]:
         """
-
         Args:
             start (array): start position in planning space
             goal (array) : goal position in planning space
             config (dict): dictionary with the needed information about the configuration options
-
-        Example:
-            config["numberOfGeneratedNodes"] = 500
-            config["testGoalAfterNumberOfNodes"]  = 10
         """
-        self.graph.clear()
-        self.lastGeneratedNodeNumber = 0
-
-        checkedStartList, checkedGoalList = self._checkStartGoal(
-            startList, goalList
-        )
-
-        self.graph.add_node(
-            0,
-            pos=checkedStartList[0],
-            mode="forward",
-        )
-        self.lastGeneratedNodeNumber += 1
-
-        self.graph.add_node(
-            1,
-            pos=checkedGoalList[0],
-            mode="backward",
-        )
-        self.lastGeneratedNodeNumber += 1
-
-        stepSize = config.get("stepSize", np.inf)
+        self.setup(startList, goalList)
 
         numIterations: int = 0
+
+        stepSize = config.get("stepSize", np.inf)
         maxIterations: int = config.get("maxIterations", 10000)
         sampleGoalProbability: float = config.get("sampleGoalProbability", 0.0)
-
         collisionDetectionSteps = config.get("collisionDetectionSteps", 40)
         numberOfGeneratedNodes = config.get("numberOfGeneratedNodes", 200)
-
         balanceTrees: bool = config.get("balanceTrees", True)
 
         while self.lastGeneratedNodeNumber < numberOfGeneratedNodes:
@@ -181,23 +164,23 @@ class BiRRT(PRMBase):
                 candidate_step,
                 steps=collisionDetectionSteps,
             ):
-                self.graph.add_node(
-                    self.lastGeneratedNodeNumber,
-                    pos=candidate_step,
-                    mode=mode,
-                )
+                new_node_id = self.createNode(candidate_step, mode=mode)
 
-                self.graph.add_edge(
-                    nearest_neighbor_idx, self.lastGeneratedNodeNumber
+                self.graph.add_edge(nearest_neighbor_idx, new_node_id)
+
+                # test new_node connection to the nearest neighbor in the other subtree
+                (
+                    nearest_neighbor_from_opposite_tree_id,
+                    nearestOtherNeighbor,
+                ) = self.getNearestNeighborInSubtree(
+                    candidate_step,
+                    "backward" if mode == "forward" else "forward",
                 )
-                nearestOtherNeighborIdx, nearestOtherNeighbor = (
-                    self.getNearestNeighborInSubtree(
-                        candidate_step,
-                        "backward" if mode == "forward" else "forward",
-                    )
-                )
-                conn_dist = np.linalg.norm(  # type: ignore
-                    candidate_step - nearestOtherNeighbor["pos"]
+                nearest_neighbor_from_opposite_tree_pos = nearestOtherNeighbor[
+                    "pos"
+                ]
+                conn_dist: float = np.linalg.norm(  # type: ignore
+                    candidate_step - nearest_neighbor_from_opposite_tree_pos
                 )
                 if (
                     not self.collisionChecker.lineInCollision(
@@ -208,12 +191,14 @@ class BiRRT(PRMBase):
                     and conn_dist <= stepSize
                 ):
                     self.graph.add_edge(
-                        self.lastGeneratedNodeNumber,
-                        nearestOtherNeighborIdx,
+                        new_node_id,
+                        nearest_neighbor_from_opposite_tree_id,
                     )
-                    mapping = {0: "start", 1: "goal"}
+                    mapping = {
+                        self.start_node_id: "start",
+                        self.goal_node_id: "goal",
+                    }
                     self.graph = nx.relabel_nodes(self.graph, mapping)
                     return self.getShortestPathFromStartToGoal(), None
-                self.lastGeneratedNodeNumber += 1
 
         return [], "max_nodes_reached"

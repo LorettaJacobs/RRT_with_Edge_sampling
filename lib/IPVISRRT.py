@@ -10,24 +10,30 @@ from typing import List
 
 import matplotlib.pyplot as plt
 import networkx as nx
-import numpy as np
 
 from lib.IPPRMBase import PRMBase
+from PointProjection import Point
 
 
 def rrtPRMVisualize(
     planner: PRMBase,
-    solution: List[np.ndarray],
-    ax: plt.Axes | None = None,
+    solution: List[Point],
+    ax: plt.Axes,
     nodeSize: int = 50,
     drawLabels: bool = False,
+    useLimits: bool = True,
 ):
     """Draw graph, obstacles and solution in a axis environment of matplotib."""
     graph = planner.graph
     collChecker = planner.collisionChecker
     pos_map = nx.get_node_attributes(graph, "pos")  # type: ignore
 
-    if pos_map:
+    if useLimits:
+        limits = collChecker.limits
+        ax.set_xlim(limits[0][0], limits[0][1])
+        ax.set_ylim(limits[1][0], limits[1][1])
+        ax.set_aspect("equal")
+    elif pos_map:
         xs = [p[0] for p in pos_map.values()]
         ys = [p[1] for p in pos_map.values()]
         x_mid = (min(xs) + max(xs)) / 2.0
@@ -41,17 +47,16 @@ def rrtPRMVisualize(
 
         ax.set_xlim(x_mid - half_side, x_mid + half_side)
         ax.set_ylim(y_mid - half_side, y_mid + half_side)
-        ax.set_aspect("equal")  # gleicher Maßstab in x und y
+        ax.set_aspect("equal")
 
     # draw graph
-
     node_modes: List[str] = list(nx.get_node_attributes(graph, "mode", default="not_bi_rrt").values())  # type: ignore
     node_types: List[str] = list(nx.get_node_attributes(graph, "type", default="normal").values())  # type: ignore
     node_colors = [
         (
-            ("#7B00FF" if mode == "backward" else "#FF00D4")
+            ("#D000FF" if mode == "forward" else "#FF00CC")
             if typ == "projected"
-            else "#0091FF" if mode == "forward" else "#FF5900"
+            else "#005EFF" if mode == "forward" else "#FFAA00"
         )
         for (mode, typ) in zip(node_modes, node_types)
     ]

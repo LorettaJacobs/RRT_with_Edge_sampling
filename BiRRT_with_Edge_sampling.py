@@ -1,13 +1,13 @@
-""" 
+"""
 Autor: Ole Hocker
 """
+
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union
 
 import networkx as nx
 import numpy as np
 from scipy.spatial import KDTree
 
-from lib.IPEnvironment import CollisionChecker
 from lib.IPPerfMonitor import IPPerfMonitor
 from lib.IPPRMBase import PRMBase
 from PointProjection import projectPointOnEdge
@@ -27,13 +27,6 @@ class BiRRTEdgeConfig(TypedDict):
 
 class BiRRTEdge(PRMBase):
 
-    def __init__(self, collChecker: CollisionChecker):
-        """
-        _collChecker: the collision checker interface
-        """
-        super(BiRRTEdge, self).__init__(collChecker)
-        self.lastGeneratedNodeNumber: int = 0
-
     def getForwardSubtree(self) -> nx.Graph[Any]:
         forwardGraphNodes = [
             n
@@ -52,7 +45,7 @@ class BiRRTEdge(PRMBase):
 
     def getNearestNeighborInSubtree(
         self,
-        pos: np.ndarray,
+        pos: Point,
         mode: Union[Literal["forward"], Literal["backward"]],
     ) -> Tuple[int, Dict[str, Any]]:
         match mode:
@@ -87,26 +80,26 @@ class BiRRTEdge(PRMBase):
                 )
                 return self._mode
 
+    @IPPerfMonitor
     def divide_edge(self, edgePoint: Point, start_Id: int, end_Id: int):
         assert (
             self.graph.nodes[start_Id]["mode"]
             == self.graph.nodes[end_Id]["mode"]
         ), "Both nodes must have the same mode"
         mode = self.graph.nodes[start_Id]["mode"]
+
         # Remove old edge
         self.graph.remove_edge(start_Id, end_Id)
 
         # Add new edges and point
-        self.graph.add_node(
-            self.lastGeneratedNodeNumber, pos=edgePoint, mode=mode
+        projected_node_id = self.createNode(
+            edgePoint, mode=mode, type="projected"
         )
 
-        self.graph.add_edge(start_Id, self.lastGeneratedNodeNumber)
-        self.graph.add_edge(self.lastGeneratedNodeNumber, end_Id)
+        self.graph.add_edge(start_Id, projected_node_id)
+        self.graph.add_edge(projected_node_id, end_Id)
 
-        self.lastGeneratedNodeNumber += 1
-
-        return self.lastGeneratedNodeNumber - 1
+        return projected_node_id
 
     def getEdgesOfSubtree(
         self, mode: Union[Literal["forward"], Literal["backward"]]
@@ -122,7 +115,7 @@ class BiRRTEdge(PRMBase):
         self,
         mode: Union[Literal["forward"], Literal["backward"]],
         sampleGoalProbability: float,
-    ) -> np.ndarray:
+    ) -> Point:
         if sampleGoalProbability > np.random.rand():
             goalNode = (
                 self.graph.nodes[1]
@@ -134,63 +127,65 @@ class BiRRTEdge(PRMBase):
 
     def stepTowardCandidate(
         self,
-        candidatePos: np.ndarray,
-        nearestNeighborPos: np.ndarray,
+        candidatePos: Point,
+        nearestNeighborPos: Point,
         stepSize: float,
-    ) -> np.ndarray:
+    ) -> Point:
         diff = candidatePos - nearestNeighborPos
         dist = np.linalg.norm(diff)
         thisStep = min(dist, stepSize)
         return nearestNeighborPos + (diff / dist) * thisStep
 
-    @IPPerfMonitor
-    def planPath(  # pyright: ignore[reportIncompatibleVariableOverride]
-        self,
-        startList: List[np.ndarray],
-        goalList: List[np.ndarray],
-        config: BiRRTEdgeConfig,
-    ) -> Tuple[List[np.ndarray], Optional[str]]:
-        """
-
-        Args:
-            start (array): start position in planning space
-            goal (array) : goal position in planning space
-            config (dict): dictionary with the needed information about the configuration options
-        """
-        # 0. reset
+    def setup(self, startList: List[Point], goalList: List[Point]):
         self.graph.clear()
         self.lastGeneratedNodeNumber = 0
 
-        # 1. check start and goal whether collision free (s. BaseClass)
         checkedStartList, checkedGoalList = self._checkStartGoal(
             startList, goalList
         )
+        self.start_pos = np.asarray(checkedStartList[0])
+        self.goal_pos = np.asarray(checkedGoalList[0])
 
-        # 2. add start and goal to graph
+        self.start_node_id = 0
+        self.goal_node_id = 1
+
         self.graph.add_node(
-            0,
-            pos=np.asarray(checkedStartList[0]),
+            self.start_node_id,
+            pos=np.asarray(self.start_pos),
             mode="forward",
         )
         self.lastGeneratedNodeNumber += 1
 
         self.graph.add_node(
-            1,
-            pos=np.asarray(checkedGoalList[0]),
+            self.goal_node_id,
+            pos=np.asarray(self.goal_pos),
             mode="backward",
         )
         self.lastGeneratedNodeNumber += 1
 
-        stepSize = config.get("stepSize", np.inf)
+    @IPPerfMonitor
+    def planPath(  # pyright: ignore[reportIncompatibleVariableOverride]
+        self,
+        startList: List[Point],
+        goalList: List[Point],
+        config: BiRRTEdgeConfig,
+    ) -> Tuple[List[Point], Optional[str]]:
+        """
+        Args:
+            start (array): start position in planning space
+            goal (array) : goal position in planning space
+            config (dict): dictionary with the needed information about the configuration options
+        """
+        self.setup(startList, goalList)
 
         numIterations: int = 0
+
+        stepSize = config.get("stepSize", np.inf)
         maxIterations: int = config.get("maxIterations", 10000)
         sampleGoalProbability: float = config.get("sampleGoalProbability", 0.0)
         orthogonalityMargin: float = config.get("orthogonalityMargin", 0.0)
-
         collisionDetectionSteps = config.get("collisionDetectionSteps", 40)
         numberOfGeneratedNodes = config.get("numberOfGeneratedNodes", 200)
-
         balanceTrees: bool = config.get("balanceTrees", True)
 
         while self.lastGeneratedNodeNumber < numberOfGeneratedNodes:
@@ -208,10 +203,8 @@ class BiRRTEdge(PRMBase):
 
             # handle case when there are no edges yet (only start node / goal node in backward mode)
             if not edges:
-                begin_pos = np.asarray(
-                    self.graph.nodes[0]["pos"]
-                    if mode == "forward"
-                    else self.graph.nodes[1]["pos"]
+                begin_pos: Point = np.asarray(
+                    self.start_pos if mode == "forward" else self.goal_pos
                 )
                 candidate_step = self.stepTowardCandidate(
                     random_free_pos, begin_pos, stepSize
@@ -219,27 +212,26 @@ class BiRRTEdge(PRMBase):
                 if not self.collisionChecker.lineInCollision(
                     begin_pos, candidate_step, steps=collisionDetectionSteps
                 ):
-                    self.graph.add_node(
-                        self.lastGeneratedNodeNumber,
-                        pos=candidate_step,
-                        mode=mode,
-                    )
+                    new_node_id = self.createNode(candidate_step, mode=mode)
                     self.graph.add_edge(
-                        0 if mode == "forward" else 1,
-                        self.lastGeneratedNodeNumber,
+                        (
+                            self.start_node_id
+                            if mode == "forward"
+                            else self.goal_node_id
+                        ),
+                        new_node_id,
                     )
-                    self.lastGeneratedNodeNumber += 1
                 continue
 
             proj_points: List[ProjectedPoint] = []
             for u, v in edges:
                 u_pos = self.graph.nodes[u]["pos"]
                 v_pos = self.graph.nodes[v]["pos"]
-                proj = projectPointOnEdge(
+                point, t = projectPointOnEdge(
                     random_free_pos, u_pos, v_pos, orthogonalityMargin
                 )
                 p = ProjectedPoint(
-                    point=proj[0], t=proj[1], edge_start_id=u, edge_end_id=v
+                    point=point, t=t, edge_start_id=u, edge_end_id=v
                 )
                 proj_points.append(p)
             pos_list = [p.point for p in proj_points]
@@ -260,13 +252,7 @@ class BiRRTEdge(PRMBase):
                 candidate_step,
                 steps=collisionDetectionSteps,
             ):
-                candidate_node_id = self.lastGeneratedNodeNumber
-                self.graph.add_node(
-                    candidate_node_id,
-                    pos=candidate_step,
-                    mode=mode,
-                )
-                self.lastGeneratedNodeNumber += 1
+                new_node_id = self.createNode(candidate_step, mode=mode)
 
                 if (
                     nearest_proj_point.t > orthogonalityMargin
@@ -277,9 +263,7 @@ class BiRRTEdge(PRMBase):
                         nearest_proj_point.edge_start_id,
                         nearest_proj_point.edge_end_id,
                     )
-                    self.graph.add_edge(
-                        divided_edge_node_id, candidate_node_id
-                    )
+                    self.graph.add_edge(divided_edge_node_id, new_node_id)
                     # Check if graph is still acyclic and connected
                     if not nx.is_tree(
                         self.getForwardSubtree()
@@ -297,38 +281,44 @@ class BiRRTEdge(PRMBase):
                 elif nearest_proj_point.t <= orthogonalityMargin:
                     self.graph.add_edge(
                         nearest_proj_point.edge_start_id,
-                        candidate_node_id,
+                        new_node_id,
                     )
                 else:
                     self.graph.add_edge(
                         nearest_proj_point.edge_end_id,
-                        candidate_node_id,
+                        new_node_id,
                     )
 
                 # test new_node connection to the nearest neighbor in the other subtree
-                nearestOtherNeighborIdx, nearestOtherNeighbor = (
-                    self.getNearestNeighborInSubtree(
-                        candidate_step,
-                        "backward" if mode == "forward" else "forward",
-                    )
+                (
+                    nearest_neighbor_from_opposite_tree_id,
+                    nearestOtherNeighbor,
+                ) = self.getNearestNeighborInSubtree(
+                    candidate_step,
+                    "backward" if mode == "forward" else "forward",
                 )
+                nearest_neighbor_from_opposite_tree_pos = nearestOtherNeighbor[
+                    "pos"
+                ]
                 conn_dist = np.linalg.norm(  # type: ignore
-                    candidate_step - nearestOtherNeighbor["pos"]
+                    candidate_step - nearest_neighbor_from_opposite_tree_pos
                 )
                 if (
                     not self.collisionChecker.lineInCollision(
-                        nearestOtherNeighbor["pos"],
+                        nearest_neighbor_from_opposite_tree_pos,
                         candidate_step,
                     )
                     and conn_dist <= stepSize
                 ):
                     self.graph.add_edge(
-                        candidate_node_id,
-                        nearestOtherNeighborIdx,
+                        new_node_id,
+                        nearest_neighbor_from_opposite_tree_id,
                     )
-                    mapping = {0: "start", 1: "goal"}
+                    mapping = {
+                        self.start_node_id: "start",
+                        self.goal_node_id: "goal",
+                    }
                     self.graph = nx.relabel_nodes(self.graph, mapping)
                     return self.getShortestPathFromStartToGoal(), None
-                self.lastGeneratedNodeNumber += 1
 
         return [], "max_nodes_reached"
