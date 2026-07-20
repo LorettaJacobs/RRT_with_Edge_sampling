@@ -1,6 +1,7 @@
-""" 
+"""
 Autor: Alisa Hummel
 """
+
 from typing import Tuple
 
 import numpy as np
@@ -15,7 +16,7 @@ def projectPointOnEdge(
     edgeEnd: Point,
     orthogonalityMargin: float = 0.0,
 ) -> Tuple[Point, float]:
-    if len(edgeStart) != len(edgeEnd) and len(edgeStart) != len(p):
+    if len(edgeStart) != len(edgeEnd) or len(edgeStart) != len(p):
         raise Exception("No valid parameters for projection")
 
     lineVec: Vector = np.subtract(edgeEnd, edgeStart)

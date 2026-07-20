@@ -20,16 +20,40 @@ def rrtPRMVisualize(
     solution: List[np.ndarray],
     ax: plt.Axes | None = None,
     nodeSize: int = 50,
+    drawLabels: bool = False,
 ):
     """Draw graph, obstacles and solution in a axis environment of matplotib."""
     graph = planner.graph
     collChecker = planner.collisionChecker
     pos_map = nx.get_node_attributes(graph, "pos")  # type: ignore
+
+    if pos_map:
+        xs = [p[0] for p in pos_map.values()]
+        ys = [p[1] for p in pos_map.values()]
+        x_mid = (min(xs) + max(xs)) / 2.0
+        y_mid = (min(ys) + max(ys)) / 2.0
+        width = max(xs) - min(xs)
+        height = max(ys) - min(ys)
+        max_side = max(width, height)
+        # 10 % Puffer an allen Seiten
+        padding = 0.1 * max_side if max_side > 0 else 1.0
+        half_side = (max_side + 2 * padding) / 2.0
+
+        ax.set_xlim(x_mid - half_side, x_mid + half_side)
+        ax.set_ylim(y_mid - half_side, y_mid + half_side)
+        ax.set_aspect("equal")  # gleicher Maßstab in x und y
+
     # draw graph
 
-    node_modes = list(nx.get_node_attributes(graph, "mode", default="not_bi_rrt").values())  # type: ignore
+    node_modes: List[str] = list(nx.get_node_attributes(graph, "mode", default="not_bi_rrt").values())  # type: ignore
+    node_types: List[str] = list(nx.get_node_attributes(graph, "type", default="normal").values())  # type: ignore
     node_colors = [
-        ("#0091FF" if mode == "forward" else "#FF5900") for mode in node_modes
+        (
+            ("#7B00FF" if mode == "backward" else "#FF00D4")
+            if typ == "projected"
+            else "#0091FF" if mode == "forward" else "#FF5900"
+        )
+        for (mode, typ) in zip(node_modes, node_types)
     ]
 
     collChecker.drawObstacles(ax)
@@ -43,8 +67,9 @@ def rrtPRMVisualize(
     )
     nx.draw_networkx_edges(graph, pos_map, ax=ax)
 
-    # labels = {n: str(n) for n in graph.nodes()}
-    # nx.draw_networkx_labels(graph, pos_map, labels=labels, ax=ax)
+    if drawLabels:
+        labels = {n: str(n) for n in graph.nodes()}
+        nx.draw_networkx_labels(graph, pos_map, labels=labels, ax=ax)
 
     # draw nodes based on solution path
     Gsp = nx.subgraph(graph, solution)  # type: ignore

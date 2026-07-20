@@ -1,7 +1,8 @@
-""" 
+"""
 Autor: Ole Hocker
 """
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, TypedDict
+
+from typing import List, NamedTuple, Optional, Tuple, TypedDict
 
 import networkx as nx
 import numpy as np
@@ -48,7 +49,9 @@ class RRTEdge(PRMBase):
         self.graph.remove_edge(start_Id, end_Id)
 
         # Add new edges and point
-        self.graph.add_node(self.lastGeneratedNodeNumber, pos=edgePoint)
+        self.graph.add_node(
+            self.lastGeneratedNodeNumber, pos=edgePoint, type="projected"
+        )
 
         self.graph.add_edge(start_Id, self.lastGeneratedNodeNumber)
         self.graph.add_edge(self.lastGeneratedNodeNumber, end_Id)
@@ -123,7 +126,9 @@ class RRTEdge(PRMBase):
             numIterations += 1
 
             if (
-                self.lastGeneratedNodeNumber // config["testGoalAfterNumberOfNodes"] > numGoalTests
+                self.lastGeneratedNodeNumber
+                // config["testGoalAfterNumberOfNodes"]
+                > numGoalTests
             ):
                 numGoalTests += 1
                 proj_points: List[ProjectedPoint] = []
@@ -133,7 +138,7 @@ class RRTEdge(PRMBase):
                     u_pos = self.graph.nodes[u]["pos"]
                     v_pos = self.graph.nodes[v]["pos"]
                     proj = projectPointOnEdge(
-                        checkedGoalList[0], u_pos, v_pos, orthogonalityMargin
+                        self.goal_pos, u_pos, v_pos, orthogonalityMargin
                     )
                     p = ProjectedPoint(
                         point=proj[0],
@@ -150,6 +155,7 @@ class RRTEdge(PRMBase):
                 nearest_proj_point = proj_points[
                     nearest_index_in_projection_points
                 ]
+                # check if the goal is reachable from the candidate
                 if not self.collisionChecker.lineInCollision(
                     nearest_proj_point.point,
                     checkedGoalList[0],
@@ -254,6 +260,7 @@ class RRTEdge(PRMBase):
                     nearest_proj_point.t > orthogonalityMargin
                     and nearest_proj_point.t < 1 - orthogonalityMargin
                 ):
+
                     new_node_id = self.divide_edge(
                         nearest_proj_point.point,
                         nearest_proj_point.edge_start_id,
