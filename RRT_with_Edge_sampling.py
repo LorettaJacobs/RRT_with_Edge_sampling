@@ -108,6 +108,9 @@ class RRTEdge(PRMBase):
         orthogonalityMargin: float = config.get("orthogonalityMargin", 0.0)
         collisionDetectionSteps = config.get("collisionDetectionSteps", 40)
         numberOfGeneratedNodes = config.get("numberOfGeneratedNodes", 200)
+        testGoalAfterNumberOfNodes = config.get(
+            "testGoalAfterNumberOfNodes", 10
+        )
 
         while self.lastGeneratedNodeNumber < numberOfGeneratedNodes:
             if numIterations >= maxIterations:
@@ -115,8 +118,7 @@ class RRTEdge(PRMBase):
             numIterations += 1
 
             if (
-                self.lastGeneratedNodeNumber
-                // config["testGoalAfterNumberOfNodes"]
+                self.lastGeneratedNodeNumber // testGoalAfterNumberOfNodes
                 > numGoalTests
             ):
                 numGoalTests += 1

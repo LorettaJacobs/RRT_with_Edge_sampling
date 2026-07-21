@@ -50,9 +50,6 @@ class PRMBase(PlanerBase):
     ) -> List[np.ndarray]:
         raise NotImplementedError("planPath is not implemented in PRMBase")
 
-    def getGraph(self) -> nx.Graph[Any]:
-        return self.graph
-
     def getNodePositions(self) -> List[np.ndarray]:
         return list(nx.get_node_attributes(self.graph, "pos").values())  # type: ignore
 
