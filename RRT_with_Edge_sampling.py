@@ -36,6 +36,7 @@ type Point = np.ndarray
 
 class RRTEdge(PRMBase):
 
+    @IPPerfMonitor
     def divide_edge(self, edgePoint: Point, start_Id: int, end_Id: int):
         # Remove old edge
         self.graph.remove_edge(start_Id, end_Id)
