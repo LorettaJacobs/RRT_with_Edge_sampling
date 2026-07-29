@@ -61,7 +61,9 @@ class RRTEdge(PRMBase):
     ) -> np.ndarray:
         if sampleGoalProbability > np.random.rand():
             return self.goal_pos
-        return self._getRandomFreePosition()
+        r = self._getRandomFreePosition()
+        # self.random_samples.append(r)
+        return r
 
     def stepTowardCandidate(
         self,
@@ -89,6 +91,9 @@ class RRTEdge(PRMBase):
 
         self.createNode(self.start_pos, type="start")
         # self.createNode(self.goal_pos, mode="backward")
+
+        # self.random_samples = []
+        # self.rejected_samples = []
 
     @IPPerfMonitor
     def planPath(  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -284,5 +289,6 @@ class RRTEdge(PRMBase):
                     mapping = {0: "start", candidate_node_id: "goal"}
                     self.graph = nx.relabel_nodes(self.graph, mapping)
                     return self.getShortestPathFromStartToGoal(), None
-
+            # else:
+            #    self.rejected_samples.append(random_free_pos)
         return [], "max_nodes_reached"

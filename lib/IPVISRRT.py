@@ -63,6 +63,33 @@ def rrtPRMVisualize(
 
     collChecker.drawObstacles(ax)
 
+    if hasattr(planner, "random_samples"):
+        print("Drawing random samples...")
+        random_samples = getattr(planner, "random_samples", [])
+        if random_samples:
+            xs = [p[0] for p in random_samples]
+            ys = [p[1] for p in random_samples]
+            ax.scatter(
+                xs,
+                ys,
+                c="blue",
+                s=10,
+                alpha=0.5,
+            )
+
+    if hasattr(planner, "rejected_samples"):
+        print("Drawing rejected samples...")
+        rejected_samples = getattr(planner, "rejected_samples", [])
+        if rejected_samples:
+            xs = [p[0] for p in rejected_samples]
+            ys = [p[1] for p in rejected_samples]
+            ax.scatter(
+                xs,
+                ys,
+                c="red",
+                s=10,
+            )
+
     nx.draw_networkx_nodes(
         graph,
         pos_map,
