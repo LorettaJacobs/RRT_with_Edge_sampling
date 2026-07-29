@@ -6,8 +6,6 @@ This code is part of a series of notebooks regarding  "Introduction to robot pat
 License is based on Creative Commons: Attribution-NonCommercial 4.0 International (CC BY-NC 4.0) (pls. check: http://creativecommons.org/licenses/by-nc/4.0/)
 """
 
-from lib.IPPerfMonitor import IPPerfMonitor
-
 from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
@@ -15,6 +13,8 @@ import numpy as np
 from shapely import plotting
 from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
+
+from lib.IPPerfMonitor import IPPerfMonitor
 
 
 class CollisionChecker(object):

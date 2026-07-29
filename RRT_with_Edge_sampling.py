@@ -38,6 +38,12 @@ class RRTEdge(PRMBase):
 
     @IPPerfMonitor
     def divide_edge(self, edgePoint: Point, start_Id: int, end_Id: int):
+        if start_Id == end_Id:
+            raise Exception(
+                "Cannot divide edge, start and end node are the same",
+                start_Id,
+                end_Id,
+            )
         # Remove old edge
         self.graph.remove_edge(start_Id, end_Id)
 
@@ -129,6 +135,15 @@ class RRTEdge(PRMBase):
                 for u, v in edges:
                     u_pos = self.graph.nodes[u]["pos"]
                     v_pos = self.graph.nodes[v]["pos"]
+                    if np.linalg.norm(u_pos - v_pos) <= 1e-6:
+                        raise Exception(
+                            "Edge with same start and end node found",
+                            u,
+                            v,
+                            u_pos,
+                            v_pos,
+                            self.graph.nodes(data=True),
+                        )
                     proj = projectPointOnEdge(
                         self.goal_pos, u_pos, v_pos, orthogonalityMargin
                     )
@@ -270,5 +285,10 @@ class RRTEdge(PRMBase):
                         nearest_proj_point.edge_end_id,
                         candidate_node_id,
                     )
+
+                if np.linalg.norm(candidate_step - self.goal_pos) < 1e-6:
+                    mapping = {0: "start", candidate_node_id: "goal"}
+                    self.graph = nx.relabel_nodes(self.graph, mapping)
+                    return self.getShortestPathFromStartToGoal(), None
 
         return [], "max_nodes_reached"
