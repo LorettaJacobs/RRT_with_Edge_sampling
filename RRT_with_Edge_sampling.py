@@ -136,14 +136,8 @@ class RRTEdge(PRMBase):
                     u_pos = self.graph.nodes[u]["pos"]
                     v_pos = self.graph.nodes[v]["pos"]
                     if np.linalg.norm(u_pos - v_pos) <= 1e-6:
-                        raise Exception(
-                            "Edge with same start and end node found",
-                            u,
-                            v,
-                            u_pos,
-                            v_pos,
-                            self.graph.nodes(data=True),
-                        )
+                        # notlösung damit keine zu kurzen Kanten entstehen (numerische probleme)
+                        continue
                     proj = projectPointOnEdge(
                         self.goal_pos, u_pos, v_pos, orthogonalityMargin
                     )
