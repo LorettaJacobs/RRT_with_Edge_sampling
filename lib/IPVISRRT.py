@@ -49,7 +49,8 @@ def rrtPRMVisualize(
         ax.set_ylim(y_mid - half_side, y_mid + half_side)
         ax.set_aspect("equal")
 
-    # draw graph
+    # Author: Ole Hocker
+
     node_modes: List[str] = list(nx.get_node_attributes(graph, "mode", default="not_bi_rrt").values())  # type: ignore
     node_types: List[str] = list(nx.get_node_attributes(graph, "type", default="normal").values())  # type: ignore
     node_colors = [

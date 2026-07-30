@@ -7,6 +7,7 @@ License is based on Creative Commons: Attribution-NonCommercial 4.0 Internationa
 """
 
 import copy
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 import matplotlib.animation
@@ -131,6 +132,7 @@ def animateSolution(
     solution: List[np.ndarray],
     visualizer: Callable[[RRT, List[np.ndarray], plt.Axes, int | None], None],
     workSpaceLimits: List[Tuple[float, float]] = [(-3, 3), (-3, 3)],
+    path: str | None = None,
 ):
     _planner = planner
     _environment = environment
@@ -190,6 +192,12 @@ def animateSolution(
             fig_local, animate, frames=frames
         )
         html = HTML(ani.to_jshtml())
+        if path is not None:
+            p = Path(path)
+            p.mkdir(parents=True, exist_ok=True)
+            path = f"{path}/animation_{_planner.__class__.__name__}.html"
+            with open(path, "w") as f:
+                f.write(ani.to_jshtml())
         display(html)
         plt.close()
     else:
@@ -230,5 +238,11 @@ def animateSolution(
             fig_local, animate, frames=frames
         )
         html = HTML(ani.to_jshtml())
+        if path is not None:
+            p = Path(path)
+            p.mkdir(parents=True, exist_ok=True)
+            path = f"{path}/animation_{_planner.__class__.__name__}.html"
+            with open(path, "w") as f:
+                f.write(ani.to_jshtml())
         display(html)
         plt.close()
